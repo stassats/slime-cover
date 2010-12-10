@@ -59,13 +59,16 @@
   :group 'slime-mode-faces)
 
 (define-minor-mode slime-cover-mode
-  "Minor mode to highlight code coverage." nil)
+    "Minor mode to highlight code coverage."
+  nil nil nil
+  (setq buffer-undo-list t))
 
 (define-derived-mode slime-cover-index-mode fundamental-mode
   "slcover"
   "Mode for browsing coverage data"
   :syntax-table text-mode-syntax-table
-  (setq buffer-read-only t))
+  (setq buffer-read-only t
+        buffer-undo-list t))
 
 (defun slime-cover-next-file ()
   "Move to the next file in cover list."
@@ -139,7 +142,9 @@
   "Display swank coverage info LINES into coverage mode buffer."
   (destructuring-bind (filename lines) info
     (when filename
-      (slime-with-popup-buffer ("*slime-cover-file*")
+      (slime-with-popup-buffer ("*slime-cover-file*"
+                                :select t
+                                :mode 'slime-cover-mode)
         (let ((inhibit-read-only t))
           (erase-buffer)
           (insert-file-contents filename)
