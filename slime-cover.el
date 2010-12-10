@@ -153,12 +153,13 @@
     (end-of-buffer)))
 
 (defun slime-cover-mark-text-state (start end state)
-  (loop with face = (slime-cover-get-face-for-state state)
-        for pos from start to end
+  (goto-char start)
+  (loop with face = `(font-lock-face ,(slime-cover-get-face-for-state state))
+        for line-end = (min (line-end-position) end)
         do
-        (goto-char pos)
-        (unless (looking-at "\n")
-          (add-text-properties pos (1+ pos) `(font-lock-face ,face)))))
+        (add-text-properties (point) line-end face)
+        (goto-char (1+ line-end))
+        until (= end line-end)))
 
 (defvar slime-cover-state-faces
   (let ((vector (make-vector 16 nil))
