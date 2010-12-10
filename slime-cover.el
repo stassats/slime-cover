@@ -162,16 +162,24 @@
 		(unless (looking-at "\n")
 		  (add-text-properties pos (1+ pos) `(font-lock-face ,face)))))
 
+(defvar slime-cover-state-faces
+  (let ((vector (make-vector 16 nil))
+        (list '((0 slime-cover-face-not-instrumented)
+                (1 slime-cover-face-executed)
+                (2 slime-cover-face-not-executed)
+                (5 slime-cover-face-both-branches-taken)
+                (6 slime-cover-face-one-branch-taken)
+                (9 slime-cover-face-one-branch-taken)
+                (10 slime-cover-face-neither-branch-taken)
+                (15 slime-cover-face-conditionalized-out))))
+    (loop for (index face) in list
+          do (setf (elt vector index) face))
+    vector))
+
 (defun slime-cover-get-face-for-state (state)
   (interactive)
-  (case state
-	(0 'slime-cover-face-not-instrumented)
-	(1 'slime-cover-face-executed)
-	(2 'slime-cover-face-not-executed)
-	(5 'slime-cover-face-both-branches-taken)
-	((6 9) 'slime-cover-face-one-branch-taken)
-	(10 'slime-cover-face-neither-branch-taken)
-	(15 'slime-cover-face-conditionalized-out)
-	(otherwise 'slime-cover-face)))
+  (or (and (< state (length slime-cover-state-faces))
+           (elt slime-cover-state-faces state))
+      slime-cover-face))
 
 (provide 'slime-cover)
