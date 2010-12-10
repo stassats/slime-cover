@@ -107,6 +107,7 @@
 (slime-define-keys slime-cover-index-mode-map
   ("n" 'slime-cover-next-file)
   ("p" 'slime-cover-previous-file)
+  ("g" 'slime-cover-update-index)
   ((kbd "RET") (lambda () (interactive)
                  (slime-cover-format-file (gethash (thing-at-point 'filename) slime-cover-file-map)))))
 
@@ -133,6 +134,7 @@
 
 (defun slime-cover-update-index ()
   "Get coverage report and file list."
+  (interactive)
   (slime-eval-async `(swank:swank-cover-report)
     'slime-cover-format-index))
 
