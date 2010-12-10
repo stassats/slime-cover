@@ -14,7 +14,8 @@
              [ "Reset cover"  slime-cover-reset ,C ]
              [ "Report index" slime-cover-report ,C ])))))
 
-(defvar slime-cover-file-map (make-hash-table :test 'equal) "Map of files with coverage data.")
+(defvar slime-cover-file-map (make-hash-table :test 'equal)
+  "Map of files with coverage data.")
 (make-variable-buffer-local 'slime-cover-file-map)
 
 (defface slime-cover-face-executed
@@ -146,11 +147,9 @@
 
 (defun slime-cover-test-face (locations)
   "Mark source code with LOCATIONS in coverage buffer."
-  ;;(interactive)
-  (let ((locations2 (reverse (car locations)))) ;car?
-    (loop for (start end state) in locations
-          do (slime-cover-mark-text-state (1+ start) (1+ end) state))
-    (end-of-buffer)))
+  (loop for (start end state) in locations
+        do (slime-cover-mark-text-state (1+ start) (1+ end) state))
+  (goto-char (point-min)))
 
 (defun slime-cover-mark-text-state (start end state)
   (goto-char start)
