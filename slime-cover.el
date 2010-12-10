@@ -158,10 +158,12 @@
 
 (defun slime-cover-mark-text-state (start end state)
   (goto-char start)
-  (loop with face = `(font-lock-face ,(slime-cover-get-face-for-state state))
+  (loop with face =  (slime-cover-get-face-for-state state)
         for line-end = (min (line-end-position) end)
+        for overlay = (make-overlay (point) line-end)
         do
-        (add-text-properties (point) line-end face)
+        (overlay-put overlay 'face face)
+        (overlay-put overlay 'priority state)
         (goto-char (1+ line-end))
         until (or (= line-end end)
                   (= (point) (point-max)))))
