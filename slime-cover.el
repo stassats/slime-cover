@@ -148,19 +148,17 @@
   "Mark source code with LOCATIONS in coverage buffer."
   ;;(interactive)
   (let ((locations2 (reverse (car locations)))) ;car?
-	(loop for (start end state) in locations
-		  for face = (slime-cover-get-face-for-state state)
-		  do
-          (slime-cover-mark-text-state (1+ start) (1+ end) state))
-	(end-of-buffer)))
+    (loop for (start end state) in locations
+          do (slime-cover-mark-text-state (1+ start) (1+ end) state))
+    (end-of-buffer)))
 
 (defun slime-cover-mark-text-state (start end state)
-  (loop for pos from start to end
-		for face = (slime-cover-get-face-for-state state)
-		do
-		(goto-char pos)
-		(unless (looking-at "\n")
-		  (add-text-properties pos (1+ pos) `(font-lock-face ,face)))))
+  (loop with face = (slime-cover-get-face-for-state state)
+        for pos from start to end
+        do
+        (goto-char pos)
+        (unless (looking-at "\n")
+          (add-text-properties pos (1+ pos) `(font-lock-face ,face)))))
 
 (defvar slime-cover-state-faces
   (let ((vector (make-vector 16 nil))
