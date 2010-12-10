@@ -12,7 +12,7 @@
              [ "Start cover"  slime-cover-start ,C ]
              [ "Stop cover"   slime-cover-stop ,C ]
              [ "Reset cover"  slime-cover-reset ,C ]
-             [ "Report index" slime-cover-index ,C ])))))
+             [ "Report index" slime-cover-report ,C ])))))
 
 (defvar slime-cover-file-map (make-hash-table :test 'equal) "Map of files with coverage data.")
 (make-variable-buffer-local 'slime-cover-file-map)
@@ -122,12 +122,14 @@
   (interactive)
   (slime-eval `(swank:swank-cover-reset)))
 
-(defun slime-cover-index ()
+(defun slime-cover-report ()
   "Show coverage report in a buffer."
   (interactive)
-  (slime-with-popup-buffer ("*slime-cover-index*")
-	(slime-cover-index-mode)
-	(slime-cover-update-index)))
+  (slime-with-popup-buffer ("*slime-cover-index*"
+                            :connection t
+                            :select t
+                            :mode 'slime-cover-index-mode)
+    (slime-cover-update-index)))
 
 (defun slime-cover-update-index ()
   "Get coverage report and file list."
