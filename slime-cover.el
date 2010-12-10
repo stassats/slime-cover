@@ -19,42 +19,42 @@
 (make-variable-buffer-local 'slime-cover-file-map)
 
 (defface slime-cover-face-executed
-  `((t (:background "lightgreen")))
+  '((t (:background "#aaffaa")))
   "Face for showing code coverage."
   :group 'slime-mode-faces)
 
 (defface slime-cover-face-conditionalized-out
-  `((t (:background "lightgray")))
+  '((t (:background "#eeeeee" :foreground "#aaaaaa")))
   "Face for showing code coverage."
   :group 'slime-mode-faces)
 
 (defface slime-cover-face-not-executed
-  `((t (:background "pink")))
+  '((t (:background "#ffaaaa")))
   "Face for showing code coverage."
   :group 'slime-mode-faces)
 
 (defface slime-cover-face-not-instrumented
-  `((t (:background "lightgray")))
+  '((t (:background "#eeeeee")))
   "Face for showing code coverage."
   :group 'slime-mode-faces)
 
 (defface slime-cover-face-both-branches-taken
-  `((t (:background "green")))
+  '((t (:background "#44dd44")))
   "Face for showing code coverage."
   :group 'slime-mode-faces)
 
 (defface slime-cover-face-one-branch-taken
-  `((t (:background "yellow")))
+    '((t (:background "#ffffaa")))
   "Face for showing code coverage."
   :group 'slime-mode-faces)
 
 (defface slime-cover-face-neither-branch-taken
-  `((t (:background "red")))
+  '((t (:background "#ee6666")))
   "Face for showing code coverage."
   :group 'slime-mode-faces)
 
 (defface slime-cover-face
-  `((t (:background "lightgray")))
+  '((t (:background "lightgray")))
   "Face for showing code coverage."
   :group 'slime-mode-faces)
 
