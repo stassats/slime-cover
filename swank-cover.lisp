@@ -20,10 +20,10 @@
 (progn
 
   (defslimefun swank-cover-start ()
-	nil)
+    (proclaim '(optimize sb-cover:store-coverage-data)))
 
   (defslimefun swank-cover-stop ()
-	nil)
+    (proclaim '(optimize (sb-cover:store-coverage-data 0))))
 
   (defslimefun swank-cover-report ()
 	(multiple-value-bind (report-file file-info) (sb-cover:report "/tmp/sb-cover-report/" :suppress-html-p t)
