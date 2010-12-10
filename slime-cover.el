@@ -66,41 +66,15 @@
   :syntax-table text-mode-syntax-table
   (setq buffer-read-only t))
 
-(defun slime-cover-current-line ()
-  "Return line number containing point."
-  (interactive)
-  (let ((result 1))
-	(save-excursion
-	  (beginning-of-line)
-	  (while (not (bobp))
-		(forward-line -1)
-		(setq result (+ result 1))))
-	result))
-
-(defun slime-cover-count-lines ()
-  "Return number of lines in buffer."
-  (interactive)
-  (let ((result 0))
-	(save-excursion
-	  (beginning-of-buffer)
-	  (while (not (eobp))
-		(forward-line)
-		(setq result (+ result 1))))
-	result))
-
 (defun slime-cover-next-file ()
   "Move to the next file in cover list."
   (interactive)
-  (when (> (- (slime-cover-count-lines) (slime-cover-current-line)) 0)
-	(beginning-of-line)
-	(next-line)))
+  (forward-line))
 
 (defun slime-cover-previous-file ()
   "Move to the previous file in cover list."
   (interactive)
-  (when (> (line-number-at-pos) 4)
-	(beginning-of-line)
-	(previous-line)))
+  (forward-line -1))
 
 ;;(set-keymap-parent slime-cover-index-mode-map slime-parent-map)
 
