@@ -158,7 +158,8 @@
         do
         (add-text-properties (point) line-end face)
         (goto-char (1+ line-end))
-        until (= end line-end)))
+        until (or (= line-end end)
+                  (= (point) (point-max)))))
 
 (defvar slime-cover-state-faces
   (let ((vector (make-vector 16 nil))
