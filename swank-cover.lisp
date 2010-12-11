@@ -26,22 +26,20 @@
     (proclaim '(optimize (sb-cover:store-coverage-data 0))))
 
   (defslimefun swank-cover-report ()
-	(multiple-value-bind (report-file file-info) (sb-cover:report "/tmp/sb-cover-report/" :suppress-html-p t)
-	  (declare (ignore report-file))
-	  (mapcar (lambda (f)
-                (destructuring-bind (source-filename report-filename expression-stats branch-stats locations) f
-                    (declare (ignore report-filename))
-                    (list
-                     (enough-namestring (pathname source-filename) (pathname source-filename))
-                     source-filename
-                     (list (sb-cover::ok-of expression-stats)
-                           (sb-cover::all-of expression-stats)
-                           (sb-cover::percent expression-stats))
-                     (list (sb-cover::ok-of branch-stats)
-                           (sb-cover::all-of branch-stats)
-                           (sb-cover::percent branch-stats))
-                     locations)))
-              file-info)))
+    (let ((info (sb-cover:report-for-slime)))
+      (mapcar (lambda (f)
+                (destructuring-bind (source-filename expression-stats branch-stats locations) f
+                  (list
+                   (enough-namestring (pathname source-filename) (pathname source-filename))
+                   source-filename
+                   (list (sb-cover::ok-of expression-stats)
+                         (sb-cover::all-of expression-stats)
+                         (sb-cover::percent expression-stats))
+                   (list (sb-cover::ok-of branch-stats)
+                         (sb-cover::all-of branch-stats)
+                         (sb-cover::percent branch-stats))
+                   locations)))
+              info)))
 
   (defslimefun swank-cover-reset ()
 	(sb-cover:reset-coverage))

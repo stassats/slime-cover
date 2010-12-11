@@ -11,7 +11,8 @@
            #:reset-coverage #:clear-coverage
            #:restore-coverage #:restore-coverage-from-file
            #:save-coverage #:save-coverage-in-file
-           #:store-coverage-data))
+           #:store-coverage-data
+           #:report-for-slime))
 
 (in-package #:sb-cover)
 
@@ -94,9 +95,30 @@ result to RESTORE-COVERAGE."
                            :name nil :type nil
                            :defaults pathname)))))
 
+(defun create-files (external-format)
+  (let (paths)
+    (maphash (lambda (k v)              ;k=filename v=coverage info
+               (declare (ignore v))
+               ;; build a md5 filename for the coverage file we will generate
+               (let* ((n (format nil "~(~{~2,'0X~}~)"
+                                 (coerce (sb-md5:md5sum-string
+                                          (sb-ext:native-namestring k))
+                                         'list)))
+                      (path (make-pathname :name n :type "html")))
+                 ;; make sure source file exists
+                 (when (probe-file k)
+                   ;; create the coverage file
+                   (with-open-file (stream path
+                                           :direction :output
+                                           :if-exists :supersede
+                                           :if-does-not-exist :create)
+                     (push (list* k n (report-file-html k stream external-format))
+                           paths)))))
+             *code-coverage-info*)
+    paths))
+
 (defun report (directory &key ((:form-mode *source-path-mode*) :whole)
-               (external-format :default)
-               suppress-html-p)
+               (external-format :default))
   "Print a code coverage report of all instrumented files into DIRECTORY.
 If DIRECTORY does not exist, it will be created. The main report will be
 printed to the file cover-index.html. The external format of the source
@@ -107,29 +129,10 @@ the coverage report will be placed on the CARs of any cons-forms, while if
 it has the value :WHOLE the whole form will be annotated (the default).
 The former mode shows explicitly which forms were instrumented, while the
 latter mode is generally easier to read."
-  (let ((paths)
-        (*default-pathname-defaults* (pathname-as-directory directory)))
+  (let* ((*default-pathname-defaults* (pathname-as-directory directory)))
     (ensure-directories-exist *default-pathname-defaults*)
-    (maphash (lambda (k v)              ;k=filename v=coverage info
-               (declare (ignore v))
-               ;; build a md5 filename for the coverage file we will generate
-               (let* ((n (format nil "~(~{~2,'0X~}~)"
-                                (coerce (sb-md5:md5sum-string
-                                         (sb-ext:native-namestring k))
-                                        'list)))
-                      (path (make-pathname :name n :type "html")))
-                 ;; make sure source file exists
-                 (when (probe-file k)
-                   ;; create the coverage file
-                   (with-open-file (stream path
-                                           :direction :output
-                                           :if-exists :supersede
-                                           :if-does-not-exist :create)
-                     (push (list* k n (report-file k stream external-format suppress-html-p))
-                           paths)))))
-             *code-coverage-info*)
-    ;;(format t "Paths: ~A~%" paths)
-    (let ((report-file (make-pathname :name "cover-index" :type "html")))
+    (let ((report-file (make-pathname :name "cover-index" :type "html"))
+          (paths (create-files external-format)))
       (with-open-file (stream report-file
                               :direction :output :if-exists :supersede
                               :if-does-not-exist :create)
@@ -166,60 +169,115 @@ latter mode is generally easier to read."
                                (all-of branch)
                                (percent branch))))
         (format stream "</table>"))
-      (values report-file paths))))
+      report-file)))
+
+(defun report-for-slime ()
+  (loop for file being each hash-key of *code-coverage-info*
+        when (probe-file file)
+        collect (cons file (report-file-for-slime file))))
+
+(defun report-file-for-slime (file)
+  (multiple-value-bind (counts maps source locations)
+      (report-file file :default)
+    (declare (ignore maps source))
+    (list (getf counts :expression)
+          (getf counts :branch)
+          (mapcar (lambda (loc) (list (first loc) (second loc) (fourth loc))) locations))))
 
 (defun percent (count)
   (unless (zerop (all-of count))
     (* 100
        (/ (ok-of count) (all-of count)))))
 
-(defun report-file (file html-stream external-format &optional suppress-html-p)
+(defun report-file-html (file html-stream external-format)
+  (multiple-value-bind (counts maps source locations)
+      (report-file file external-format)
+    (format html-stream "<html><head>")
+    (write-styles html-stream)
+    (format html-stream "</head><body>")
+    (print-report html-stream file counts
+                  (make-states source maps locations)
+                  source)
+    (format html-stream "</body></html>")
+    (list (getf counts :expression)
+          (getf counts :branch)
+          (mapcar (lambda (loc) (list (first loc) (second loc) (fourth loc))) locations))))
+
+(defun cache-source-maps (source)
+  (with-input-from-string (stream source)
+    (loop with map = nil
+          with form = nil
+          with eof = nil
+          for i from 0
+          do (setf (values form map)
+                   (handler-case
+                       (read-and-record-source-map stream)
+                     (end-of-file ()
+                       (setf eof t))
+                     (error (error)
+                       (warn "Error when recording source map for toplevel form ~A:~%  ~A" i error)
+                       (values nil
+                               (make-hash-table)))))
+          until eof
+          when map
+          collect (cons form map))))
+
+(defun mark-conditionalized-out (maps source states)
+  (mapcar (lambda (map)
+            (maphash (lambda (k locations)
+                       (declare (ignore k))
+                       (dolist (location locations)
+                         (destructuring-bind (start end suppress) location
+                           (when suppress
+                             (fill-with-state source states 15 (1- start)
+                                              end)))))
+                     (cdr map)))
+          maps))
+
+(defun update-counts (mode counts state)
+  (cond ((eql mode :branch)
+         (let ((count (getf counts :branch)))
+           ;; For branches mode each record accounts for two paths
+           (incf (ok-of count)
+                 (ecase state
+                   (5 2)
+                   ((6 9) 1)
+                   (10 0)))
+           (incf (all-of count) 2)))
+        (t
+         (let ((count (getf counts :expression)))
+           (when (eql state 1)
+             (incf (ok-of count)))
+           (incf (all-of count))))))
+
+(defun make-states (source maps locations)
+  (let ((states (make-array (length source)
+                            :initial-element 0
+                            :element-type '(unsigned-byte 4))))
+    (mark-conditionalized-out maps source states)
+    (dolist (location (stable-sort locations #'<
+                                   :key (lambda (location)
+                                          (- (second location)
+                                             (first location)))))
+      (destructuring-bind (start end source state) location
+        (fill-with-state source states state start end)))
+    states))
+
+(defun report-file (file external-format)
   "Generate code coverage report of FILE.
 Unless SUPPRESS-HTML-P is T, print the report into the stream HTML-STREAM."
-  ;;(format t "Coverage: ~A~%" (gethash file *code-coverage-info*))
   (let* ((source (detabify (read-file file external-format)))
-         (states (make-array (length source)
-                             :initial-element 0
-                             :element-type '(unsigned-byte 4)))
+         
          ;; Convert the code coverage records to a more suitable format
          ;; for this function.
          (expr-records (convert-records (gethash file *code-coverage-info*)
                                         :expression))
          (branch-records (convert-records (gethash file *code-coverage-info*)
                                           :branch))
-         ;; Cache the source-maps
-         (maps (with-input-from-string (stream source)
-                 (loop with map = nil
-                       with form = nil
-                       with eof = nil
-                       for i from 0
-                       do (setf (values form map)
-                                (handler-case
-                                    (read-and-record-source-map stream)
-                                  (end-of-file ()
-                                    (setf eof t))
-                                  (error (error)
-                                    (warn "Error when recording source map for toplevel form ~A:~%  ~A" i error)
-                                    (values nil
-                                            (make-hash-table)))))
-                       until eof
-                       when map
-                       collect (cons form map)))))
-    ;;(format t "Expr records: ~A~%" expr-records)
-    ;;(format t "Branch records: ~A~%" branch-records)
-    ;; Mark conditionalized out forms.
-    (mapcar (lambda (map)
-              (maphash (lambda (k locations)
-                         (declare (ignore k))
-                         ;;(format t "K: ~A~%" k)
-                         ;;(format t "locations: ~A~%" locations)
-                         (dolist (location locations)
-                           (destructuring-bind (start end suppress) location
-                             (when suppress
-                               (fill-with-state source states 15 (1- start)
-                                                end)))))
-                       (cdr map)))
-            maps)
+         (maps (cache-source-maps source))
+         (counts (list :branch (make-instance 'sample-count :mode :branch)
+                       :expression (make-instance 'sample-count :mode :expression)))
+         (locations ()))
     ;; Go through all records, find the matching source in the file,
     ;; and update STATES to contain the state of the record in the
     ;; indexes matching the source location. We do this in two stages:
@@ -227,64 +285,27 @@ Unless SUPPRESS-HTML-P is T, print the report into the stream HTML-STREAM."
     ;; does the update, in order from shortest to longest ranges. This
     ;; ensures that for each index in STATES will reflect the state of
     ;; the innermost containing form.
-    (let ((counts (list :branch (make-instance 'sample-count :mode :branch)
-                        :expression (make-instance 'sample-count :mode :expression)))
-          (locations nil))
-      (let ((records (append branch-records expr-records)))
-        ;;(format t "All records: ~A~%" records)
-        (dolist (record records)
-          (destructuring-bind (mode path state) record
-            (let* ((path (reverse path))
-                   (tlf (car path))
-                   (source-form (car (nth tlf maps)))
-                   (source-map (cdr (nth tlf maps)))
-                   (source-path (cdr path)))
-              ;; Update the counts for this path.
-              (cond ((eql mode :branch)
-                     (let ((count (getf counts :branch)))
-                       ;; For branches mode each record accounts for two paths
-                       (incf (ok-of count)
-                             (ecase state
-                               (5 2)
-                               ((6 9) 1)
-                               (10 0)))
-                       (incf (all-of count) 2)))
-                    (t
-                     (let ((count (getf counts :expression)))
-                       (when (eql state 1)
-                         (incf (ok-of count)))
-                       (incf (all-of count)))))
-              (if source-map
-                  (handler-case
-                      (multiple-value-bind (start end)
-                          (source-path-source-position (cons 0 source-path)
-                                                       source-form
-                                                       source-map)
-                        (push (list start end source state) locations))
-                    (error ()
-                      (warn "Error finding source location for source path ~A in file ~A~%" source-path file)))
-                  (warn "Unable to find a source map for toplevel form ~A in file ~A~%" tlf file)))))
-        ;; Now process the locations, from the shortest range to the longest
-        ;; one. If two locations have the same range, the one with the higher
-        ;; state takes precedence. The latter condition ensures that if
-        ;; there are both normal- and a branch-states for the same form,
-        ;; the branch-state will be used.
-        (setf locations (sort locations #'> :key #'fourth))
-        (dolist (location (stable-sort locations #'<
-                                       :key (lambda (location)
-                                              (- (second location)
-                                                 (first location)))))
-          (destructuring-bind (start end source state) location
-            (fill-with-state source states state start end))))
-      (unless suppress-html-p
-        (format html-stream "<html><head>")
-        (write-styles html-stream)
-        (format html-stream "</head><body>")
-        (print-report html-stream file counts states source)
-        (format html-stream "</body></html>"))
-      (list (getf counts :expression)
-            (getf counts :branch)
-            (mapcar (lambda (loc) (list (first loc) (second loc) (fourth loc))) locations)))))
+    (dolist (record (append branch-records expr-records))
+      (destructuring-bind (mode path state) record
+        (let* ((path (reverse path))
+               (tlf (car path))
+               (source-form (car (nth tlf maps)))
+               (source-map (cdr (nth tlf maps)))
+               (source-path (cdr path)))
+          (update-counts mode counts state)
+          (if source-map
+              (handler-case
+                  (multiple-value-bind (start end)
+                      (source-path-source-position (cons 0 source-path)
+                                                   source-form
+                                                   source-map)
+                    (push (list start end source state) locations))
+                (error ()
+                  (warn "Error finding source location for source path ~A in file ~A~%"
+                        source-path file)))
+              (warn "Unable to find a source map for toplevel form ~A in file ~A~%"
+                    tlf file)))))
+    (values counts maps source (sort locations #'> :key #'fourth))))
 
 (defun fill-with-state (source states state start end)
   (let* ((pos (position #\Newline source
@@ -417,7 +438,6 @@ table.summary tr.subheading td { text-align: left; font-weight: bold; padding-le
 </style>"))
 
 (defun convert-records (records mode)
-  ;;(format t "Convert ~A records in: ~A~%" mode records)
   (ecase mode
     (:expression
      (loop for record in records
