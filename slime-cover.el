@@ -60,7 +60,8 @@
 
 (define-minor-mode slime-cover-mode
     "Minor mode to highlight code coverage."
-  nil nil nil
+  nil nil
+  '(("v" . slime-cover-view-file))
   (setq buffer-undo-list t))
 
 (define-derived-mode slime-cover-index-mode fundamental-mode
@@ -79,6 +80,13 @@
   "Move to the previous file in cover list."
   (interactive)
   (forward-line -1))
+
+(defun slime-cover-view-file ()
+  (interactive)
+  (when buffer-file-name
+    (let ((position (point)))
+      (with-current-buffer (find-file-other-window buffer-file-name)
+        (goto-char position)))))
 
 ;;(set-keymap-parent slime-cover-index-mode-map slime-parent-map)
 
@@ -145,6 +153,7 @@
       (slime-with-popup-buffer ("*slime-cover-file*"
                                 :select t
                                 :mode 'slime-cover-mode)
+        (setq buffer-file-name filename)
         (let ((inhibit-read-only t))
           (erase-buffer)
           (insert-file-contents filename)
