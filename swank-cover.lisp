@@ -25,6 +25,9 @@
   (defslimefun swank-cover-stop ()
     (proclaim '(optimize (sb-cover:store-coverage-data 0))))
 
+  (defun format-percents (n)
+    (format nil "~,1f" n))
+  
   (defslimefun swank-cover-report ()
     (let ((info (sb-cover:report-for-slime)))
       (mapcar (lambda (f)
@@ -35,10 +38,10 @@
                     (enough-namestring source-filename (pathname source-filename))
                     (sb-cover::ok-of expression-stats)
                     (sb-cover::all-of expression-stats)
-                    (sb-cover::percent expression-stats)
+                    (format-percents (sb-cover::percent expression-stats))
                     (sb-cover::ok-of branch-stats)
                     (sb-cover::all-of branch-stats)
-                    (sb-cover::percent branch-stats))
+                    (format-percents (sb-cover::percent branch-stats)))
                    locations)))
               info)))
 
