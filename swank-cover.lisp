@@ -30,14 +30,15 @@
       (mapcar (lambda (f)
                 (destructuring-bind (source-filename expression-stats branch-stats locations) f
                   (list
-                   (enough-namestring (pathname source-filename) (pathname source-filename))
-                   source-filename
-                   (list (sb-cover::ok-of expression-stats)
-                         (sb-cover::all-of expression-stats)
-                         (sb-cover::percent expression-stats))
-                   (list (sb-cover::ok-of branch-stats)
-                         (sb-cover::all-of branch-stats)
-                         (sb-cover::percent branch-stats))
+                   (list
+                    source-filename
+                    (enough-namestring source-filename (pathname source-filename))
+                    (sb-cover::ok-of expression-stats)
+                    (sb-cover::all-of expression-stats)
+                    (sb-cover::percent expression-stats)
+                    (sb-cover::ok-of branch-stats)
+                    (sb-cover::all-of branch-stats)
+                    (sb-cover::percent branch-stats))
                    locations)))
               info)))
 

@@ -14,7 +14,7 @@
              [ "Reset cover"  slime-cover-reset ,C ]
              [ "Report index" slime-cover-report ,C ])))))
 
-(defvar slime-cover-file-map (make-hash-table :test 'equal)
+(defvar slime-cover-file-map nil
   "Map of files with coverage data.")
 (make-variable-buffer-local 'slime-cover-file-map)
 
@@ -81,6 +81,12 @@
   (interactive)
   (forward-line -1))
 
+(defun slime-cover-show-current-file ()
+  (interactive)
+  (let ((index (get-text-property (point) 'table-row)))
+    (when (numberp index)
+      (slime-cover-format-file (nth index slime-cover-file-map)))))
+
 (defun slime-cover-view-file ()
   (interactive)
   (when buffer-file-name
@@ -94,8 +100,7 @@
   ("n" 'slime-cover-next-file)
   ("p" 'slime-cover-previous-file)
   ("g" 'slime-cover-update-index)
-  ((kbd "RET") (lambda () (interactive)
-                 (slime-cover-format-file (gethash (thing-at-point 'filename) slime-cover-file-map)))))
+  ((kbd "RET") 'slime-cover-show-current-file))
 
 (defun slime-cover-start ()
   (interactive)
@@ -124,31 +129,9 @@
   (slime-eval-async `(swank:swank-cover-report)
     'slime-cover-format-index))
 
-(defun slime-cover-format-index (lines)
-  "Show the list of coverage files and stats."
-  (let ((inhibit-read-only t))
-	(erase-buffer)
-	;;(insert (format "stuff: %s\n" slime-cover-file-map))
-	(insert (format "Cover Report:\n"))
-    (insert (format "\t\t\t\t\t\tExpression\t\t\tBranch\n"))
-    (insert (format "\tSource File\t"))
-    (insert (format "\tCovered\tTotal\t%%"))
-    (insert (format "\tCovered\tTotal\t%%"))
-    (dolist (line lines)
-      (destructuring-bind (short-path long-path expression-stats branch-stats locations) line
-        (puthash short-path (list long-path locations) slime-cover-file-map)
-        (insert (format "\n%s" short-path))
-        (insert (format "\t\t%s\t\t%s\t%s" (first expression-stats) (second expression-stats) (third expression-stats)))
-        (insert (format "\t%s\t%s\t%s" (first branch-stats) (second branch-stats) (third branch-stats)))))
-    (beginning-of-buffer)
-    ;;(goto-char (point-min))
-    ;;(forward-char 10)
-    (forward-line 3)
-    ))
-
 (defun slime-cover-format-file (info)
   "Display swank coverage info LINES into coverage mode buffer."
-  (destructuring-bind (filename lines) info
+  (destructuring-bind (filename . locations) info
     (when filename
       (slime-with-popup-buffer ("*slime-cover-file*"
                                 :select t
@@ -157,7 +140,7 @@
         (let ((inhibit-read-only t))
           (erase-buffer)
           (insert-file-contents filename)
-          (slime-cover-test-face lines))))))
+          (slime-cover-test-face locations))))))
 
 (defun slime-cover-test-face (locations)
   "Mark source code with LOCATIONS in coverage buffer."
@@ -196,5 +179,78 @@
   (or (and (< state (length slime-cover-state-faces))
            (elt slime-cover-state-faces state))
       slime-cover-face))
+;;; Table formatting
+(defun slime-longest-lines (list-of-lines)
+  (let ((lengths (make-list (length (car list-of-lines)) 0)))
+    (flet ((process-line (line)
+             (loop for element in line
+                   for length on lengths
+                   do (setf (car length)
+                            (max (length (prin1-to-string element t))
+                                 (car length))))))
+      (mapc 'process-line list-of-lines)
+      lengths)))
+
+(defun slime-insert-row (row longest-lines)
+  (unless (bolp) (insert "\n"))
+  (loop for i from 0
+        for align in longest-lines
+        for element in row
+        for string = (prin1-to-string element t)
+        do
+        (insert string)
+        (insert-char ?\  (- align (length string)))))
+
+(defun slime-insert-table (headers rows)
+  (erase-buffer)
+  (let* ((column-widths (slime-column-widths headers rows)))
+    (slime-insert-headers headers column-widths)
+    (loop for row-number from 0
+          for row in rows
+          do (slime-propertize-region (list 'table-row row-number)
+               (slime-insert-row row (cdr column-widths))))))
+
+(defun slime-column-widths (headers rows)
+  (let* ((rest (cons (mapcan 'cadr (copy-tree headers)) rows))
+         (rest-widths (mapcar (lambda (x) (+ x 3)) (slime-longest-lines rest))))
+    (cons
+     (loop for (header subheaders) in headers
+           and column = 0 then (+ column (length subheaders))
+           collect (max (length (prin1-to-string header t))
+                        (reduce #'+ rest-widths :start column
+                                :end (+ column (length subheaders)))))
+     rest-widths)))
+
+(defun slime-insert-headers (headers column-widths)
+  (loop for (header) in headers
+        for width in (car column-widths)
+        do (multiple-value-bind (left right)
+               (truncate* (- width (length header)) 2)
+             (insert-char ?\  left)
+             (insert header)
+             (insert-char ?\  (+ left right))))
+  (add-text-properties (point-min) (point) '(face header-line))
+  (insert "\n")
+  (slime-insert-row (mapcan 'cadr (copy-tree headers))
+                    (cdr column-widths))
+  (add-text-properties (line-beginning-position) (point) '(face header-line))
+  (insert "\n"))
+
+(defun setup-map (lines)
+  (setq slime-cover-file-map
+        (loop for ((filename) data) in lines
+              collect (cons filename data))))
+
+(defun slime-cover-format-index (data)
+  "Show the list of coverage files and stats."
+  (let ((inhibit-read-only t)
+        (rows (mapcar 'cdar data)))
+    (setup-map data)
+    (slime-insert-table '(("" ("Source file"))
+                          ("Expression" ("Covered" "Total" "%"))
+                          ("Branch" ("Covered" "Total" "%")))
+                        rows)
+    (goto-char (point-min))
+    (forward-line 2)))
 
 (provide 'slime-cover)
