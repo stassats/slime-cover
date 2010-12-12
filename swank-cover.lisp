@@ -12,7 +12,8 @@
 
 #+sbcl
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (require :sb-cover))
+  (require 'sb-md5)
+  (load (merge-pathnames "cover.lisp" (or #.*compile-file-pathname* *load-pathname*))))
 
 (defvar *coverage* nil)
 
