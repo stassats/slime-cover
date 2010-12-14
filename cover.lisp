@@ -255,7 +255,8 @@ latter mode is generally easier to read."
                             :initial-element 0
                             :element-type '(unsigned-byte 4))))
     (mark-conditionalized-out maps source states)
-    (dolist (location (stable-sort locations #'<
+    (dolist (location (stable-sort (sort locations #'> :key #'third)
+                                   #'<
                                    :key (lambda (location)
                                           (- (second location)
                                              (first location)))))
@@ -305,7 +306,7 @@ Unless SUPPRESS-HTML-P is T, print the report into the stream HTML-STREAM."
                         source-path file)))
               (warn "Unable to find a source map for toplevel form ~A in file ~A~%"
                     tlf file)))))
-    (values counts maps source (sort locations #'> :key #'third))))
+    (values counts maps source locations)))
 
 (defun fill-with-state (source states state start end)
   (let* ((pos (position #\Newline source
