@@ -182,7 +182,7 @@ latter mode is generally easier to read."
     (declare (ignore maps source))
     (list (getf counts :expression)
           (getf counts :branch)
-          (mapcar (lambda (loc) (list (first loc) (second loc) (fourth loc))) locations))))
+          locations)))
 
 (defun percent (count)
   (unless (zerop (all-of count))
@@ -201,7 +201,7 @@ latter mode is generally easier to read."
     (format html-stream "</body></html>")
     (list (getf counts :expression)
           (getf counts :branch)
-          (mapcar (lambda (loc) (list (first loc) (second loc) (fourth loc))) locations))))
+          locations)))
 
 (defun cache-source-maps (source)
   (with-input-from-string (stream source)
@@ -259,7 +259,7 @@ latter mode is generally easier to read."
                                    :key (lambda (location)
                                           (- (second location)
                                              (first location)))))
-      (destructuring-bind (start end source state) location
+      (destructuring-bind (start end state) location
         (fill-with-state source states state start end)))
     states))
 
@@ -299,13 +299,13 @@ Unless SUPPRESS-HTML-P is T, print the report into the stream HTML-STREAM."
                       (source-path-source-position (cons 0 source-path)
                                                    source-form
                                                    source-map)
-                    (push (list start end source state) locations))
+                    (push (list start end state) locations))
                 (error ()
                   (warn "Error finding source location for source path ~A in file ~A~%"
                         source-path file)))
               (warn "Unable to find a source map for toplevel form ~A in file ~A~%"
                     tlf file)))))
-    (values counts maps source (sort locations #'> :key #'fourth))))
+    (values counts maps source (sort locations #'> :key #'third))))
 
 (defun fill-with-state (source states state start end)
   (let* ((pos (position #\Newline source
