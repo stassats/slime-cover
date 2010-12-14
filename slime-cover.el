@@ -18,6 +18,9 @@
   "Map of files with coverage data.")
 (make-variable-buffer-local 'slime-cover-file-map)
 
+(make-variable-buffer-local
+ (defvar slime-cover-file-name nil))
+
 (defface slime-cover-face-executed
   '((t (:background "#aaffaa")))
   "Face for showing code coverage."
@@ -89,9 +92,9 @@
 
 (defun slime-cover-view-file ()
   (interactive)
-  (when buffer-file-name
+  (when slime-cover-file-name
     (let ((position (point)))
-      (with-current-buffer (find-file-other-window buffer-file-name)
+      (with-current-buffer (find-file-other-window slime-cover-file-name)
         (goto-char position)))))
 
 ;;(set-keymap-parent slime-cover-index-mode-map slime-parent-map)
@@ -136,7 +139,7 @@
       (slime-with-popup-buffer ("*slime-cover-file*"
                                 :select t
                                 :mode 'slime-cover-mode)
-        (setq buffer-file-name filename)
+        (setq slime-cover-file-name filename)
         (let ((inhibit-read-only t))
           (erase-buffer)
           (insert-file-contents filename)
