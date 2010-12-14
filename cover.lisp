@@ -178,7 +178,7 @@ latter mode is generally easier to read."
 
 (defun report-file-for-slime (file)
   (multiple-value-bind (counts maps source locations)
-      (report-file file :default)
+      (report-file file)
     (declare (ignore maps source))
     (list (getf counts :expression)
           (getf counts :branch)
@@ -191,7 +191,8 @@ latter mode is generally easier to read."
 
 (defun report-file-html (file html-stream external-format)
   (multiple-value-bind (counts maps source locations)
-      (report-file file external-format)
+      (report-file file :external-format external-format
+                   :detabify t)
     (format html-stream "<html><head>")
     (write-styles html-stream)
     (format html-stream "</head><body>")
@@ -264,13 +265,10 @@ latter mode is generally easier to read."
         (fill-with-state source states state start end)))
     states))
 
-(defun report-file (file external-format)
-  "Generate code coverage report of FILE.
-Unless SUPPRESS-HTML-P is T, print the report into the stream HTML-STREAM."
-  (let* ((source (detabify (read-file file external-format)))
-         
-         ;; Convert the code coverage records to a more suitable format
-         ;; for this function.
+(defun report-file (file &key (external-format :default) detabify)
+  "Generate code coverage report of FILE."
+  (let* ((source (read-file file external-format))
+         (source (if detabify (detabify source) source))
          (expr-records (convert-records (gethash file *code-coverage-info*)
                                         :expression))
          (branch-records (convert-records (gethash file *code-coverage-info*)
